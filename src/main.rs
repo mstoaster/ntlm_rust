@@ -9,10 +9,4 @@ fn main() {
 
     let cred = credential::acquire_credentials(&username, &domain, &pwd)
         .expect("this shouldn't fail");
-
-    println!("For {1}\\{0}, credential is {2:?}",
-        cred.user_name,
-        cred.domain_name,
-        cred.password
-    );
 }
