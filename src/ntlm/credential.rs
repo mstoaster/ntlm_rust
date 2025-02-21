@@ -21,6 +21,13 @@ impl Credential {
         }
     }
 
+    fn generate_hmac_md5_signature(key: &[u8], data: &[u8]) -> Vec<u8> {
+        let mut algo: Hmac<Md5> = Hmac::new_from_slice(&key)
+                                    .expect("unexpected failure generating hmac-md5 signature");
+        algo.update(&data);
+        algo.finalize().into_bytes().to_vec()
+    }
+
     // Passes-in a cleartext password, returns an NTOWF hash of the password.
     // NTOWFv2(Passwd, User, UserDom) as 
     //      HMAC_MD5( MD4(UNICODE(Passwd)), UNICODE(ConcatenationOf( Uppercase(User), UserDom ) ) )
@@ -47,14 +54,18 @@ impl Credential {
         let combined_bytes: Vec<u8> = combined.iter().flat_map(|x| x.to_le_bytes()).collect();
 
         // Step 3: calcualte the NTOWF by doing the HMAC_MD5
-        type HmacMd5 = Hmac<Md5>;
-        let mut hmac_md5: HmacMd5 = HmacMd5::new_from_slice(&pwd_hash).expect("unexpected error converting key for NTOWF");
-        hmac_md5.update(&combined_bytes);
-
-        let result = hmac_md5.finalize().into_bytes().to_vec();
-        result
+        Self::generate_hmac_md5_signature(&pwd_hash, &combined_bytes)
     }
+
+    // Set SessionBaseKey to HMAC_MD5(ResponseKeyNT, NTProofStr)
+    pub fn create_session_key(&self, proof_str: &Vec<u8>) -> Vec<u8> {
+        Self::generate_hmac_md5_signature(&self.password, &proof_str)
+    }
+
+    pub fn user(&self) -> &String { &self.user_name }
+    pub fn domain(&self) -> &String {&self.domain_name }
 }
+    
 
 pub fn acquire_credentials(username: &String, domainname: &String, password: &String) -> Option<Credential> {
     Some(Credential::from(username, domainname, password))
@@ -75,6 +86,7 @@ mod test {
 
         assert_eq!(actual_ntowf.len(), 16);
 
+        // count how many bytes are the same between the expected and actual NTOWF buffers.
         let num_of_same_bytes = expected_ntowf
                                         .iter()
                                         .zip(actual_ntowf.iter())
