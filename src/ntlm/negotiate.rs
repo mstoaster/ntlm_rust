@@ -47,7 +47,7 @@ pub const DEFAULT_NEGOTIATE_FLAGS: u32 = NTLMSSP_NEGOTIATE_128
 // The NEGOTIATE message contains more fields, but many are hard-coded and they're not needed
 // to be stored. They just have to be added for serialization purposes.
 pub struct NegotiateMessage {
-    nego_flags: u32,
+    pub nego_flags: u32,
     domain_name: String,
     workstation: String,
 }
@@ -63,12 +63,17 @@ impl NegotiateMessage {
         }
     }
 
-    pub fn from(domain: &String, workstation: &String) -> NegotiateMessage {
-        NegotiateMessage {
+    // NegotaiteMessage can only accept strings which was <= u16 max (0xFFFF). 
+    pub fn from(domain: &String, workstation: &String) -> Option<NegotiateMessage> {
+        if domain.len() > u16::MAX as usize || workstation.len() > u16::MAX as usize{
+            return None
+        }
+        
+        Some(NegotiateMessage {
             nego_flags: DEFAULT_NEGOTIATE_FLAGS,
             domain_name: String::from(domain),
             workstation: String::from(workstation)
-        }
+        })
     }
 
     // https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-nlmp/b34032e5-3aae-4bc6-84c3-c6d80eadf7f2

@@ -9,5 +9,5 @@ fn main() {
     let machine = String::from("machine");
 
     let negomsg = NegotiateMessage::from(&domain, &machine);
-    println!("Negotiate Message: {:?}", &negomsg.serialize());
+    println!("Negotiate Message: {:?}", &negomsg.unwrap().serialize());
 }
