@@ -1,12 +1,13 @@
 
 mod ntlm;
-use ntlm::credential;
+use ntlm::{credential, negotiate::NegotiateMessage};
 
 fn main() {
     let username = String::from("toaster");
     let domain = String::from("earth");
     let pwd = String::from("imaketoast");
+    let machine = String::from("machine");
 
-    let cred = credential::acquire_credentials(&username, &domain, &pwd)
-        .expect("this shouldn't fail");
+    let negomsg = NegotiateMessage::from(&domain, &machine);
+    println!("Negotiate Message: {:?}", &negomsg.unwrap().serialize());
 }
