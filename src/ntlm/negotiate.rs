@@ -1,9 +1,48 @@
+use std::ops::BitOr;
 
-struct Field {
-    len: u16,
-    max_len: u16,
-    offset: u32
+// https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-nlmp/99d90ff4-957f-4c8a-80e4-5bfe5a9a9832
+// Adding mod hack for the "enum class" concept from c++
+pub mod NegotiateFlags {
+    pub const NTLMSSP_NEGOTIATE_56: u32 = 1 << 0;
+    pub const NTLMSSP_NEGOTIATE_KEY_EXCH: u32 = 1 << 1;
+    pub const NTLMSSP_NEGOTIATE_128: u32 = 1 << 2;
+    pub const R1: u32 = 1 << 3;
+    pub const R2: u32 = 1 << 4;
+    pub const R3: u32 = 1 << 5;
+    pub const NTLMSSP_NEGOTIATE_VERSION: u32 = 1 << 6;
+    pub const R4: u32 = 1 << 7;
+    pub const NTLMSSP_NEGOTIATE_TARGET_INFO: u32 = 1 << 8;
+    pub const NTLMSSP_REQUEST_NON_NT_SESSION_KEY: u32 = 1 << 9;
+    pub const R5: u32 = 1 << 10;
+    pub const NTLMSSP_NEGOTIATE_IDENTIFY: u32 = 1 << 11;
+    pub const NTLMSSP_NEGOTIATE_EXTENDED_SESSIONSECURITY: u32 = 1 << 12;
+    pub const R6: u32 = 1 << 13;
+    pub const NTLMSSP_TARGET_TYPE_SERVER: u32 = 1 << 14;
+    pub const NTLMSSP_TARGET_TYPE_DOMAIN: u32 = 1 << 15;
+    pub const NTLMSSP_NEGOTIATE_ALWAYS_SIGN: u32 = 1 << 16;
+    pub const R7: u32 = 1 << 17;
+    pub const NTLMSSP_NEGOTIATE_OEM_WORKSTATION_SUPPLIED: u32 = 1 << 18;
+    pub const NTLMSSP_NEGOTIATE_OEM_DOMAIN_SUPPLIED: u32 = 1 << 19;
+    pub const NTLMSSP_NEGOTIATE_ANONYMOUS: u32 = 1 << 20;
+    pub const R8: u32 = 1 << 21;
+    pub const NTLMSSP_NEGOTIATE_NTLM: u32 = 1 << 22;
+    pub const R9: u32 = 1 << 23;
+    pub const NTLMSSP_NEGOTIATE_LM_KEY: u32 = 1 << 24;
+    pub const NTLMSSP_NEGOTIATE_DATAGRAM: u32 = 1 << 25;
+    pub const NTLMSSP_NEGOTIATE_SEAL: u32 = 1 << 26;
+    pub const NTLMSSP_NEGOTIATE_SIGN: u32 = 1 << 27;
+    pub const R10: u32 = 1 << 28;
+    pub const NTLMSSP_REQUEST_TARGET: u32 = 1 << 29;
+    pub const NTLM_NEGOTIATE_OEM: u32 = 1 << 30;
+    pub const NTLMSSP_NEGOTIATE_UNICODE: u32 = 1 << 31;
 }
+
+pub const DEFAULT_NEGOTIATE_FLAGS: u32 = NTLMSSP_NEGOTIATE_128 
+                                        | NTLMSSP_NEGOTIATE_KEY_EXCH 
+                                        | NTLMSSP_NEGOTIATE_ALWAYS_SIGN 
+                                        | NTLMSSP_NEGOTIATE_SEAL 
+                                        | NTLMSSP_NEGOTIATE_SIGN 
+                                        | NTLMSSP_NEGOTIATE_UNICODE;
 
 // The NEGOTIATE message contains more fields, but many are hard-coded and they're not needed
 // to be stored. They just have to be added for serialization purposes.
@@ -12,8 +51,25 @@ pub struct NegotiateMessage {
     domain_name: String,
     workstation: String,
 }
+use NegotiateFlags::*;
 
 impl NegotiateMessage {
+
+    pub fn new() -> NegotiateMessage{
+        NegotiateMessage {
+            nego_flags: DEFAULT_NEGOTIATE_FLAGS,
+            domain_name: String::new(),
+            workstation: String::new()
+        }
+    }
+
+    pub fn from(domain: &String, workstation: &String) -> NegotiateMessage {
+        NegotiateMessage {
+            nego_flags: DEFAULT_NEGOTIATE_FLAGS,
+            domain_name: String::from(domain),
+            workstation: String::from(workstation)
+        }
+    }
 
     // https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-nlmp/b34032e5-3aae-4bc6-84c3-c6d80eadf7f2
     //  Signature (8 bytes): An 8-byte character array that MUST contain the ASCII string ('N', 'T', 'L', 'M', 'S', 'S', 'P', '\0').
@@ -34,22 +90,33 @@ impl NegotiateMessage {
     pub fn serialize(&self) -> Vec<u8> {
         let mut buffer: Vec<u8> = Vec::new();
         
-        // first, add the NTLMSSP data
-        let ntlm_str: &str = "NTLMSSP";
-        buffer.extend_from_slice(&mut ntlm_str.as_bytes());
+        // Add the NTLMSSP data.
+        buffer.extend_from_slice("NTLMSSP".as_bytes());
 
-        // Add the MessageType, which must be 0x00000001
-        let message_type: u32 = 1;
-        buffer.extend_from_slice(&message_type.to_be_bytes());
+        // Add the MessageType, which must be 0x00000001.
+        buffer.extend_from_slice(&(1 as u32).to_le_bytes());
 
-        // add the negotiated flags
-        buffer.extend_from_slice(&self.nego_flags.to_be_bytes());
+        // Add the negotiated flags.
+        buffer.extend_from_slice(&self.nego_flags.to_le_bytes());
 
-        // add the domain fields.
-        // We already checked that the string is of the right lenght;
-        let domain_len: u16 = self.domain_name.len() as u16;
-        let domain_max_len = domain_len;
-        buffer.extend_from_slice(&domain_len.to_be_bytes());
+        // Add the domain fields.
+        buffer.extend_from_slice(&(self.domain_name.len() as u16).to_le_bytes()); // Len
+        buffer.extend_from_slice(&(self.domain_name.len() as u16).to_le_bytes()); // MaxLen
+    
+        buffer.extend_from_slice(&(0 as u32).to_le_bytes()); // offset of the payload. As this is the first item, it's 0.
+
+        // Add the workstation fields.
+        buffer.extend_from_slice(&(self.workstation.len() as u16).to_le_bytes()); // Len
+        buffer.extend_from_slice(&(self.workstation.len() as u16).to_le_bytes()); // MaxLen = Len
+
+        buffer.extend_from_slice(&(self.domain_name.len() as u32).to_le_bytes()); // offset of the payload. We put this after the domain_name field
+
+        // Add the version information.
+        buffer.extend_from_slice(&(0 as u64).to_le_bytes());
+
+        // Add the buffers.
+        buffer.extend_from_slice(self.domain_name.as_bytes());
+        buffer.extend_from_slice(self.workstation.as_bytes());
 
         buffer
     }
