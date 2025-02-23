@@ -8,6 +8,6 @@ fn main() {
     let pwd = String::from("imaketoast");
     let machine = String::from("machine");
 
-    let negomsg = NegotiateMessage::from(&domain, &machine);
+    let negomsg = NegotiateMessage::new_from_names(&domain, &machine);
     println!("Negotiate Message: {:?}", &negomsg.unwrap().serialize());
 }

@@ -1,36 +1,27 @@
 
-#[macro_use]
-macro_rules! read_u16 {
-    ($val:expr) => {
-        &($val as u16).to_le_bytes()
-    };
-    ($buffer:expr, $pos:expr) => {
-        let val = $buffer[pos..pos+2].to_le_bytes();
-        pos += 2
+#[macro_export]
+macro_rules! try_read_u16 {
+    ($buffer:expr, $pos:expr) => {{
+        let val = u16::from_le_bytes($buffer[$pos..$pos+2].try_into().ok()?);
+        $pos += 2;
         val
-    }
+    }};
 }
 
-#[macro_use]
-macro_rules! read_u32 {
-    ($val:expr) => {
-        &($val as u32).to_le_bytes()
-    };
-    ($buffer:expr, $pos:expr) => {
-        let val = $buffer[pos..pos+4].to_le_bytes();
-        pos += 4
+#[macro_export]
+macro_rules! try_read_u32 {
+    ($buffer:expr, $pos:expr) => {{
+        let val = u32::from_le_bytes($buffer[$pos..$pos+4].try_into().ok()?);
+        $pos += 4;
         val
-    }
+    }};
 }
-#[macro_use]
-macro_rules! write_u16 {
-    ($val:expr) => {
-        .chain(read_u16!($val))
-    };
-}
-#[macro_use]
-macro_rules! write_u32 {
-    ($val:expr) => {
-        .chain(read_u32!($val))
-    };
+
+#[macro_export]
+macro_rules! try_read_u64 {
+    ($buffer:expr, $pos:expr) => {{
+        let val = u64::from_le_bytes($buffer[$pos..$pos+8].try_into().ok()?);
+        $pos += 8;
+        val
+    }};
 }

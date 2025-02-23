@@ -11,6 +11,6 @@ pub struct ChallengeMessage {
 
 impl ChallengeMessage {
     pub fn process_negotiate(&mut self, nego_msg: &Vec<u8>) {
-        NegotiateMessage::d
+        
     }
-},
+}

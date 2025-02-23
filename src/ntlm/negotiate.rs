@@ -1,5 +1,3 @@
-use std::{ops::BitOr, sync::Arc};
-
 // https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-nlmp/99d90ff4-957f-4c8a-80e4-5bfe5a9a9832
 // Adding mod hack for the "enum class" concept from c++
 pub mod NegotiateFlags {
@@ -52,9 +50,7 @@ pub struct NegotiateMessage {
     workstation: String,
 }
 use NegotiateFlags::*;
-
-#[macro_use]
-use super::serialize;
+use crate::{try_read_u16, try_read_u32, try_read_u64};
 
 impl NegotiateMessage {
 
@@ -129,31 +125,71 @@ impl NegotiateMessage {
         buffer
     }
 
-    pub fn serializev2(&self) -> Vec<u8> {
-        "NTLMSSP\0".as_bytes().into_iter()
-            write_u16!()
-    }
-
     pub fn deserialize(buffer: &Vec<u8>) -> Option<NegotiateMessage> {
         let min_size: usize = 10 * 4; // minimum size of the NEGOTIATE_MESSAGE
         if buffer.len() < min_size { 
             return None;
         }
 
-        // check if the first 8 bytes are "NTLMSSP\0";
+        // check if the first 8 bytes are "NTLMSSP\0".
         let mut pos: usize = 0;
         if &buffer[0..8] != b"NTLMSSP\0" {
-            return None
+            return None;
         }
         pos += 8;
 
-        // The next 4 bytes are the Message Field
-        let negotiated_flags: u32 = u32::from_le_bytes(buffer[pos..pos+4].try_into().ok()?);
-        pos += 4;
+        // The next 4 bytes are the Message Field. It must be 1.
+        let message: u32 = try_read_u32!(buffer,pos);
+        if message != 1 {
+            return None;
+        }
 
+        // The next 4 bytes are the negotiated flags.
+        let negotiated_flags: u32 = try_read_u32!(buffer,pos);
 
-        
+        // The next 8 bytes are as follows:
+        // 1. Domain len     - 2 bytes
+        // 2. Domain max len - 2 bytes (ignored)
+        // 3. Domain offset  - 4 bytes
+        let domain_len = try_read_u16!(buffer,pos);
+        let _ = try_read_u16!(buffer,pos);
+        let domain_offset = try_read_u32!(buffer,pos);
 
-        return None;
+        // The next 8 bytes are as follows:
+        // 1. Workstation len     - 2 bytes
+        // 2. Workstation max len - 2 bytes (ignored)
+        // 3. Workstation offset  - 4 bytes
+        let workstation_len: u16 = try_read_u16!(buffer,pos);
+        let _ = try_read_u16!(buffer,pos);
+        let workstaiton_offset: u32 = try_read_u32!(buffer,pos);
+
+        // we have both domain len and workstation len. The buffer must be large enought to hold them:
+        if ((domain_len as usize) + (workstation_len as usize) + min_size) > buffer.len() {
+            return None;
+        }
+
+        // The next 8 bytes are for version, ignored.
+        let _ = try_read_u64!(buffer,pos);
+
+        // Now, we copy the strings. They're OEM strings.
+        let domain_slice: &[u8] = {
+            let start: usize = min_size + domain_offset as usize;
+            let end: usize = start + domain_len as usize;
+            &buffer[start..end]
+        };
+        let domain_str = String::from_utf8(domain_slice.to_vec()).ok()?;
+
+        let workstation_slice: &[u8] = {
+            let start: usize = min_size + workstaiton_offset as usize;
+            let end: usize = start + workstation_len as usize;
+            &buffer[start..end]
+        };
+        let workstation_str = String::from_utf8(workstation_slice.to_vec()).ok()?;
+
+        return Some(NegotiateMessage {
+            nego_flags: negotiated_flags,
+            domain_name: domain_str,
+            workstation: workstation_str
+        });
     }
 }
