@@ -1,4 +1,4 @@
-use std::ops::BitOr;
+use std::{ops::BitOr, sync::Arc};
 
 // https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-nlmp/99d90ff4-957f-4c8a-80e4-5bfe5a9a9832
 // Adding mod hack for the "enum class" concept from c++
@@ -53,6 +53,9 @@ pub struct NegotiateMessage {
 }
 use NegotiateFlags::*;
 
+#[macro_use]
+use super::serialize;
+
 impl NegotiateMessage {
 
     pub fn new() -> NegotiateMessage{
@@ -64,7 +67,7 @@ impl NegotiateMessage {
     }
 
     // NegotaiteMessage can only accept strings which was <= u16 max (0xFFFF). 
-    pub fn from(domain: &String, workstation: &String) -> Option<NegotiateMessage> {
+    pub fn new_from_names(domain: &String, workstation: &String) -> Option<NegotiateMessage> {
         if domain.len() > u16::MAX as usize || workstation.len() > u16::MAX as usize{
             return None
         }
@@ -96,7 +99,7 @@ impl NegotiateMessage {
         let mut buffer: Vec<u8> = Vec::new();
         
         // Add the NTLMSSP data.
-        buffer.extend_from_slice("NTLMSSP".as_bytes());
+        buffer.extend_from_slice("NTLMSSP\0".as_bytes());
 
         // Add the MessageType, which must be 0x00000001.
         buffer.extend_from_slice(&(1 as u32).to_le_bytes());
@@ -124,5 +127,33 @@ impl NegotiateMessage {
         buffer.extend_from_slice(self.workstation.as_bytes());
 
         buffer
+    }
+
+    pub fn serializev2(&self) -> Vec<u8> {
+        "NTLMSSP\0".as_bytes().into_iter()
+            write_u16!()
+    }
+
+    pub fn deserialize(buffer: &Vec<u8>) -> Option<NegotiateMessage> {
+        let min_size: usize = 10 * 4; // minimum size of the NEGOTIATE_MESSAGE
+        if buffer.len() < min_size { 
+            return None;
+        }
+
+        // check if the first 8 bytes are "NTLMSSP\0";
+        let mut pos: usize = 0;
+        if &buffer[0..8] != b"NTLMSSP\0" {
+            return None
+        }
+        pos += 8;
+
+        // The next 4 bytes are the Message Field
+        let negotiated_flags: u32 = u32::from_le_bytes(buffer[pos..pos+4].try_into().ok()?);
+        pos += 4;
+
+
+        
+
+        return None;
     }
 }

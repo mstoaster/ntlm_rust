@@ -57,21 +57,17 @@ impl PairVec {
         let mut local_vec: Vec<u8> = Vec::new();
         for pair in self.m_pairs.iter() {
             // first, add the id;
-            let local_id = pair.id as u16;
-            local_vec.push(((local_id >> 8) & 0xFF) as u8);
-            local_vec.push((local_id & 0xFF) as u8);
+            local_vec.extend_from_slice(&(pair.id as u16).to_le_bytes());
 
             // then, add the size.
-            local_vec.push(((pair.data.len() >> 8) & 0xFF) as u8);
-            local_vec.push((pair.data.len() & 0xFF) as u8);
-
+            local_vec.extend_from_slice(&pair.data.len().to_le_bytes());
+        
             // then, copy the data.
-            local_vec.append(&mut pair.data.clone());
+            local_vec.extend(&pair.data);
         }
-        // at the end, add the EoL pair
-        for _i in 0..4 {
-            local_vec.push(0);
-        }
+        // finally, add the EoL.
+        local_vec.extend_from_slice(&(Id::MsvAvEOL as u32).to_le_bytes());
+        
         local_vec   
     }
 }
