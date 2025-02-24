@@ -193,3 +193,33 @@ impl NegotiateMessage {
         });
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn serialize_and_deserialize() {
+        let helper = | original: &NegotiateMessage |  {
+            let new_message = NegotiateMessage::deserialize(&original.serialize()).expect("serialize -> deserialize failed");
+
+            assert_eq!(new_message.nego_flags, original.nego_flags);
+            assert_eq!(new_message.domain_name, original.domain_name);
+            assert_eq!(new_message.workstation, original.workstation);
+        };
+    
+        let original_message = NegotiateMessage::new_from_names(
+            &String::from("kitchen"), 
+            &String::from("appliance"))
+            .expect("init test");
+        
+        helper(&original_message);
+
+        let empty_message = NegotiateMessage::new_from_names(
+            &String::from(""), 
+            &String::from(""))
+            .expect("empty strings");
+
+        helper(&empty_message);
+    }
+}
