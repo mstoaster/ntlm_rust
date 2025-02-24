@@ -1,5 +1,6 @@
 // https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-nlmp/99d90ff4-957f-4c8a-80e4-5bfe5a9a9832
 // Adding mod hack for the "enum class" concept from c++
+#[allow(dead_code)]
 pub mod NegotiateFlags {
     pub const NTLMSSP_NEGOTIATE_56: u32 = 1 << 0;
     pub const NTLMSSP_NEGOTIATE_KEY_EXCH: u32 = 1 << 1;
