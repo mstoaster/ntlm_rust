@@ -1,4 +1,4 @@
-// https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-nlmp/99d90ff4-957f-4c8a-80e4-5bfe5a9a9832
+    // https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-nlmp/99d90ff4-957f-4c8a-80e4-5bfe5a9a9832
 // Adding mod hack for the "enum class" concept from c++
 #[allow(dead_code)]
 pub mod NegotiateFlags {
@@ -105,13 +105,11 @@ impl NegotiateMessage {
         // Add the domain fields.
         buffer.extend_from_slice(&(self.domain_name.len() as u16).to_le_bytes()); // Len
         buffer.extend_from_slice(&(self.domain_name.len() as u16).to_le_bytes()); // MaxLen
-    
         buffer.extend_from_slice(&(0 as u32).to_le_bytes()); // offset of the payload. As this is the first item, it's 0.
 
         // Add the workstation fields.
         buffer.extend_from_slice(&(self.workstation.len() as u16).to_le_bytes()); // Len
         buffer.extend_from_slice(&(self.workstation.len() as u16).to_le_bytes()); // MaxLen = Len
-
         buffer.extend_from_slice(&(self.domain_name.len() as u32).to_le_bytes()); // offset of the payload. We put this after the domain_name field
 
         // Add the version information.
