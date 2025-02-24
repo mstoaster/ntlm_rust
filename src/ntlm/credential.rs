@@ -1,3 +1,4 @@
+use digest::InvalidLength;
 use md5::{Digest, Md5};
 use hmac::{Hmac, Mac};
 use md4::Md4;
@@ -5,33 +6,40 @@ use md4::Md4;
 pub struct Credential {
     user_name: String,
     domain_name: String,
+    computer_name: String,
     password: Vec<u8>
 }
 
 impl Credential {
     pub fn new() -> Self {
-        Self { user_name: String::new(), domain_name: String::new(), password: Vec::new()}
+        Self { user_name: String::new(), domain_name: String::new(), computer_name: String::new(), password: Vec::new()}
     }
 
-    pub fn from(user: &String, domain: &String, password: &String) -> Self {
-        Credential {
+    pub fn acquire_credentials(user: &str, domain: &str, computer: &str, password: &str) -> Option<Self> {
+        // names cannot be more than 255 characters per DNS RFC
+        let max_char_count = 255;
+        if user.len() > max_char_count || domain.len() > max_char_count || computer.len() > max_char_count {
+            return None;
+        }
+
+        Some(Credential {
             user_name: String::from(user),
             domain_name: String::from(domain),
-            password: Self::ntowf(user, domain, password)
-        }
+            computer_name: String::from(computer),
+            password: Self::ntowf(user, domain, password)?
+        })
     }
 
-    fn generate_hmac_md5_signature(key: &[u8], data: &[u8]) -> Vec<u8> {
-        let mut algo: Hmac<Md5> = Hmac::new_from_slice(&key)
-                                    .expect("unexpected failure generating hmac-md5 signature");
+    fn generate_hmac_md5_signature(key: &[u8], data: &[u8]) -> Result<Vec<u8>, InvalidLength> {
+        let mut algo: Hmac<Md5> = Hmac::new_from_slice(&key)?;
         algo.update(&data);
-        algo.finalize().into_bytes().to_vec()
+        Ok(algo.finalize().into_bytes().to_vec())
     }
 
     // Passes-in a cleartext password, returns an NTOWF hash of the password.
     // NTOWFv2(Passwd, User, UserDom) as 
     //      HMAC_MD5( MD4(UNICODE(Passwd)), UNICODE(ConcatenationOf( Uppercase(User), UserDom ) ) )
-    fn ntowf(username: &String, domainname: &String, password: &String) -> Vec<u8> {
+    fn ntowf(username: &str, domainname: &str, password: &str) -> Option<Vec<u8>> {
 
         // Calculate the password hash, which will act as our key   
         // Step 1: Convert the UTF-8 str to UTF-16 as required by the protocol
@@ -54,22 +62,19 @@ impl Credential {
         let combined_bytes: Vec<u8> = combined.iter().flat_map(|x| x.to_le_bytes()).collect();
 
         // Step 3: calcualte the NTOWF by doing the HMAC_MD5
-        Self::generate_hmac_md5_signature(&pwd_hash, &combined_bytes)
+        Self::generate_hmac_md5_signature(&pwd_hash, &combined_bytes).ok()
     }
 
     // Set SessionBaseKey to HMAC_MD5(ResponseKeyNT, NTProofStr)
-    pub fn create_session_key(&self, proof_str: &Vec<u8>) -> Vec<u8> {
-        Self::generate_hmac_md5_signature(&self.password, &proof_str)
+    pub fn create_session_key(&self, proof_str: &Vec<u8>) -> Option<Vec<u8>> {
+        Self::generate_hmac_md5_signature(&self.password, &proof_str).ok()
     }
 
     pub fn user(&self) -> &String { &self.user_name }
     pub fn domain(&self) -> &String {&self.domain_name }
+    pub fn computer(&self) -> &String{&self.computer_name}
 }
-    
 
-pub fn acquire_credentials(username: &String, domainname: &String, password: &String) -> Option<Credential> {
-    Some(Credential::from(username, domainname, password))
-}
 
 #[cfg(test)]
 mod test {
@@ -82,7 +87,7 @@ mod test {
         let password: String = String::from("Password");
 
         let expected_ntowf: [u8; 16] = [0x0c, 0x86, 0x8a, 0x40, 0x3b, 0xfd, 0x7a, 0x93, 0xa3, 0x00, 0x1e, 0xf2, 0x2e, 0xf0, 0x2e, 0x3f];
-        let actual_ntowf = Credential::ntowf(&username, &domainname, &password);
+        let actual_ntowf = Credential::ntowf(&username, &domainname, &password).unwrap();
 
         assert_eq!(actual_ntowf.len(), 16);
 

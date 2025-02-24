@@ -53,6 +53,17 @@ pub struct NegotiateMessage {
 use NegotiateFlags::*;
 use crate::{try_read_u16, try_read_u32, try_read_u64};
 
+use super::credential::Credential;
+
+impl From<&Credential> for NegotiateMessage {
+    fn from(cred: &Credential) -> Self {
+        NegotiateMessage {
+            nego_flags: DEFAULT_NEGOTIATE_FLAGS,
+            domain_name: String::from(cred.domain()),
+            workstation: String::from(cred.domain())
+        }
+    }
+}
 impl NegotiateMessage {
 
     pub fn new() -> NegotiateMessage{
@@ -61,19 +72,6 @@ impl NegotiateMessage {
             domain_name: String::new(),
             workstation: String::new()
         }
-    }
-
-    // NegotaiteMessage can only accept strings which was <= u16 max (0xFFFF). 
-    pub fn new_from_names(domain: &String, workstation: &String) -> Option<NegotiateMessage> {
-        if domain.len() > u16::MAX as usize || workstation.len() > u16::MAX as usize{
-            return None
-        }
-        
-        Some(NegotiateMessage {
-            nego_flags: DEFAULT_NEGOTIATE_FLAGS,
-            domain_name: String::from(domain),
-            workstation: String::from(workstation)
-        })
     }
 
     // https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-nlmp/b34032e5-3aae-4bc6-84c3-c6d80eadf7f2
@@ -208,19 +206,13 @@ mod test {
             assert_eq!(new_message.domain_name, original.domain_name);
             assert_eq!(new_message.workstation, original.workstation);
         };
-    
-        let original_message = NegotiateMessage::new_from_names(
-            &String::from("kitchen"), 
-            &String::from("appliance"))
-            .expect("init test");
-        
+
+        let reg_cred = Credential::acquire_credentials("toast", "kitchen", "machine1", "IMakeToast1!").unwrap();
+        let original_message = NegotiateMessage::from(&reg_cred);
         helper(&original_message);
 
-        let empty_message = NegotiateMessage::new_from_names(
-            &String::from(""), 
-            &String::from(""))
-            .expect("empty strings");
-
+        let empty_cred = Credential::acquire_credentials("", "", "", "").unwrap();
+        let empty_message = NegotiateMessage::from(&empty_cred);
         helper(&empty_message);
     }
 }
